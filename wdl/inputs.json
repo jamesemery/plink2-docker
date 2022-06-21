@@ -1,6 +1,5 @@
 {
-  "vcfToPgen.convert.preemptible_tries": 2,
-  "vcfToPgen.input_vcf": "testData/sample.vcf",
-  "vcfToPgen.output_prefix": "output"
+  "vcfToPgen.output_prefix": "out",
+  "vcfToPgen.input_vcfs": ["testData/sample.vcf", "testData/sample2.vcf", "testData/sample3.vcf"]
 }
 

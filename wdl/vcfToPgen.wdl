@@ -1,24 +1,33 @@
 version 1.0
 
+struct Pgen {
+    File pgen
+    File psam
+    File pvar
+}
+
 workflow vcfToPgen{
     input {
-    File input_vcf
-    File? input_vcf_index
-    String output_prefix
+        Array[File] input_vcfs
+        String output_prefix
     }
 
-    call convertVcfToPgen as convert {
-        input :
-            input_vcf = input_vcf,
-            input_vcf_index = input_vcf_index,
-            output_prefix = output_prefix
+    scatter(input_vcf in input_vcfs){
+        call convertVcfToPgen as convert {
+            input :
+                input_vcf = input_vcf,
+                output_prefix = output_prefix
+        }
+    }
+
+    output {
+        Array[Pgen] pgens = convert.pgen
     }
 }
 
 task convertVcfToPgen {
     input {
         File input_vcf
-        File? input_vcf_index
 
         String output_prefix
         Int? preemptible_tries
@@ -28,13 +37,15 @@ task convertVcfToPgen {
     meta {
         description: "Convert a vcf to pgen"
     }
+
+    String name = basename(basename(input_vcf, ".gz"),".vcf")
     command <<<
         set -e
 
         plink2 \
           --vcf ~{input_vcf} \
           --make-pgen vzs \
-          --out ~{output_prefix}
+          --out ~{output_prefix}.~{name}
     >>>
 
     runtime {
@@ -45,8 +56,10 @@ task convertVcfToPgen {
     }
 
     output {
-        File pgen = "${output_prefix}.pgen"
-        File psam = "${output_prefix}.psam"
-        File pvar = "${output_prefix}.pvar.zst"
+    Pgen pgen= {
+                   "pgen" : "~{output_prefix}.~{name}.pgen",
+                   "psam" : "~{output_prefix}.~{name}.psam",
+                   "pvar": "~{output_prefix}.~{name}.pvar.zst"
+               }
     }
 }
