@@ -1,0 +1,5 @@
+{
+  "vcfToPgen.output_prefix": "out",
+  "vcfToPgen.input_vcfs": ["gs://emeryj-testing/plinkTrials/sample_subdivided_1.vcf", "gs://emeryj-testing/plinkTrials/sample_subdivided_2.vcf", "gs://emeryj-testing/plinkTrials/sample_subdivided_3.vcf"]
+}
+
