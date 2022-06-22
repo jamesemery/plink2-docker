@@ -18,7 +18,8 @@ workflow vcfToPgen{
         call convertVcfToPgen as convert {
             input :
                 input_vcf = input_vcf,
-                output_prefix = output_prefix
+                output_prefix = output_prefix,
+                compress = false
         }
     }
 
@@ -53,14 +54,16 @@ workflow vcfToPgen{
         input :
             pgens = merge_layer_1.pgen,
             output_prefix = "alldone",
-            disk_size = 300
+            disk_size = 300,
+            compress = true
        }
 
     call mergePgens as mergeEverythinTest {
         input :
             pgens = convert.pgen,
             output_prefix = "alldone",
-            disk_size = 300
+            disk_size = 300,
+            compress = true
        }
 
 
@@ -75,6 +78,7 @@ task mergePgens {
         Array[Pgen] pgens
         Int disk_size = ceil (3 * 100) + 20
         String output_prefix
+        Boolean compress = false
     }
 
 
@@ -92,7 +96,7 @@ task mergePgens {
 
         plink2  \
          --pmerge-list allfiles.txt pfile-vzs \
-         --pmerge-output-vzs \
+         ~{if compress then "--pmerge-output-vzs" else " " } \
          --out ~{output_prefix}
 
         ls .
@@ -108,7 +112,7 @@ task mergePgens {
     Pgen pgen= {
                    "pgen" : "~{output_prefix}.pgen",
                    "psam" : "~{output_prefix}.psam",
-                   "pvar": "~{output_prefix}.pvar.zst"
+                   "pvar": "~{output_prefix}.pvar~{if compress then '.zst' else '' }"
                }
     }
 
@@ -121,6 +125,7 @@ task convertVcfToPgen {
         String output_prefix
         Int? preemptible_tries
         Int disk_size = ceil (3 * size(input_vcf, "GB")) + 20
+        Boolean compress = true
     }
 
     meta {
@@ -133,7 +138,7 @@ task convertVcfToPgen {
 
         plink2 \
           --vcf ~{input_vcf} \
-          --make-pgen vzs \
+          --make-pgen ~{if compress then "vzs" else "" } \
           --out ~{output_prefix}.~{name}
     >>>
 
@@ -148,7 +153,7 @@ task convertVcfToPgen {
     Pgen pgen= {
                    "pgen" : "~{output_prefix}.~{name}.pgen",
                    "psam" : "~{output_prefix}.~{name}.psam",
-                   "pvar": "~{output_prefix}.~{name}.pvar.zst"
+                   "pvar": "~{output_prefix}.~{name}.pvar~{if compress then '.zst' else '' }" #"~{output_prefix}.~{name}.pvar.zst"
                }
     }
 }
