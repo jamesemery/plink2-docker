@@ -19,7 +19,7 @@ workflow vcfToPgen{
             input :
                 input_vcf = input_vcf,
                 output_prefix = output_prefix,
-                compress = false
+                compress = true
         }
     }
 
@@ -28,25 +28,27 @@ workflow vcfToPgen{
          Pgen sub_arr_layer1 = convert.pgen[(round(i * scatter_div_first + j))]
        }
 
-#       scatter(k in range(ceil(length(sub_arr_layer1) / scatter_div_second))) {
-#            scatter(j in range(round(if scatter_div_second > length(sub_arr_layer1) - (k * scatter_div_second) then length(sub_arr_layer1) - (k * scatter_div_second) else scatter_div_second ))) {
-#              Pgen sub_arr_layer2 = sub_arr_layer1[(round(k * scatter_div_second + j))]
-#            }
-#            String uniquifiedName = "merged_"+i+"_"+k
-#            call mergePgens as merge_layer_2 {
-#                input :
-#                    pgens = sub_arr_layer2,
-#                    output_prefix = uniquifiedName,
-#                    disk_size = 60
-#               }
-#       }
+       scatter(k in range(ceil(length(sub_arr_layer1) / scatter_div_second))) {
+            scatter(j in range(round(if scatter_div_second > length(sub_arr_layer1) - (k * scatter_div_second) then length(sub_arr_layer1) - (k * scatter_div_second) else scatter_div_second ))) {
+              Pgen sub_arr_layer2 = sub_arr_layer1[(round(k * scatter_div_second + j))]
+            }
+            String uniquifiedName = "merged_"+i+"_"+k
+            call mergePgens as merge_layer_2 {
+                input :
+                    pgens = sub_arr_layer2,
+                    output_prefix = uniquifiedName,
+                    disk_size = 60,
+                    compress = true
+               }
+       }
 
         String uniquifiedName = "merged_"+i
         call mergePgens as merge_layer_1 {
             input :
-                pgens = sub_arr_layer1,
+                pgens = merge_layer_2,
                 output_prefix = uniquifiedName,
-                disk_size = 300
+                disk_size = 300,
+                compress = true
            }
     }
 
@@ -54,7 +56,7 @@ workflow vcfToPgen{
         input :
             pgens = merge_layer_1.pgen,
             output_prefix = "alldone",
-            disk_size = 300,
+            disk_size = 3000,
             compress = true
        }
 
@@ -68,7 +70,6 @@ workflow vcfToPgen{
 
 
     output {
-        Array[Pgen] pgens = convert.pgen
         Pgen merged = mergeFinal.pgen
     }
 }
@@ -81,16 +82,16 @@ task mergePgens {
         Boolean compress = false
     }
 
-
+    #cat $JSON_FILE | jq -r '[.[] | {pgen, pvar, psam} | join(" ")] | join("\n")' > allfiles.txt
     command <<<
-        set -x
+        set -e
 
         JSON_FILE=~{write_json(pgens)}
 
         apt-get update
         apt-get install jq -y
 
-        cat $JSON_FILE | jq -r '[.[] | {pgen, pvar, psam} | join(" ")] | join("\n")' > allfiles.txt
+        cat $JSON_FILE | jq -r '[.[].psam | .[0:-5] ] | join("\n")' > allfiles.txt
 
         cat allfiles.txt
 
