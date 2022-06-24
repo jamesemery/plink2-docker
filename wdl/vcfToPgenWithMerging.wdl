@@ -8,13 +8,14 @@ struct Pgen {
 
 workflow vcfToPgen{
     input {
-        Array[File] input_vcfs
+        File input_vcfs
         String output_prefix
         Float scatter_div_first = 2.0
         Float scatter_div_second = 2.0
     }
 
-    scatter(input_vcf in input_vcfs){
+	Array[File] input_vcfs_lines = read_lines(input_vcfs)
+    scatter(input_vcf in input_vcfs_lines){
         call convertVcfToPgen as convert {
             input :
                 input_vcf = input_vcf,
@@ -32,21 +33,21 @@ workflow vcfToPgen{
             scatter(j in range(round(if scatter_div_second > length(sub_arr_layer1) - (k * scatter_div_second) then length(sub_arr_layer1) - (k * scatter_div_second) else scatter_div_second ))) {
               Pgen sub_arr_layer2 = sub_arr_layer1[(round(k * scatter_div_second + j))]
             }
-            String uniquifiedName = "merged_"+i+"_"+k
+            String uniquifiedName_layer2 = "merged_"+i+"_"+k+"_"
             call mergePgens as merge_layer_2 {
                 input :
                     pgens = sub_arr_layer2,
-                    output_prefix = uniquifiedName,
+                    output_prefix = uniquifiedName_layer2,
                     disk_size = 60,
                     compress = true
                }
        }
 
-        String uniquifiedName = "merged_"+i
+        String uniquifiedName_layer1 = "merged_"+i
         call mergePgens as merge_layer_1 {
             input :
-                pgens = merge_layer_2,
-                output_prefix = uniquifiedName,
+                pgens = merge_layer_2.pgen,
+                output_prefix = uniquifiedName_layer1,
                 disk_size = 300,
                 compress = true
            }
@@ -59,15 +60,6 @@ workflow vcfToPgen{
             disk_size = 3000,
             compress = true
        }
-
-    call mergePgens as mergeEverythinTest {
-        input :
-            pgens = convert.pgen,
-            output_prefix = "alldone",
-            disk_size = 300,
-            compress = true
-       }
-
 
     output {
         Pgen merged = mergeFinal.pgen
@@ -137,8 +129,12 @@ task convertVcfToPgen {
     command <<<
         set -e
 
+        apt-get update && apt-get install -y bcftools
+
+        bcftools view --max-alleles 250 ~{input_vcf} >> ./intermediate.vcf
+
         plink2 \
-          --vcf ~{input_vcf} \
+          --vcf ./intermediate.vcf \
           --make-pgen ~{if compress then "vzs" else "" } \
           --out ~{output_prefix}.~{name}
     >>>
